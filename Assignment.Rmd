@@ -1,0 +1,131 @@
+#Practical Machine Learning - Prediction Assignment
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement ??? a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).   
+
+
+##Data
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+###Getting Data
+
+Loading the required packages
+```{r}
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+Reading the data into R
+```{r}
+trainURL<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testURL<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training<- read.csv(trainURL)
+testing<- read.csv(testURL)
+```
+
+###Partitioning Data
+
+Set seed to ensure reproducibility.
+
+Create 2 data sets by partitioning the data; 60% for training and 40% for testing
+```{r}
+set.seed(1234)
+inTrain<- createDataPartition(y = training$classe, p = 0.6, list = FALSE)
+mtraining<- training[inTrain,]
+mvalidation<- training[-inTrain,]
+dim(mtraining)
+dim(mvalidation)
+dim(testing)
+```
+
+###Cleaning Data
+
+Clean the data using near zero variance
+```{r}
+nzv<- nearZeroVar(training, saveMetrics = TRUE)
+nzv
+
+```
+
+```{r}
+mtraining2<- mtraining[,!nzv$nzv]
+mvali2<- mvalidation[,!nzv$nzv]
+mtesting2<- testing[,!nzv$nzv]
+dim(mtraining2)
+dim(mvali2)
+dim(mtesting2)
+```
+
+Removing NA's
+
+```{r}
+remNA<- (colSums(is.na(mtraining2))==0)
+mtraining2<- mtraining2[,remNA]
+remNA1<- (colSums(is.na(mvali2))==0)
+mvali2<- mvali2[,remNA1]
+mtesting2<- mtesting2[,remNA]
+dim(mtraining2)
+dim(mvali2)
+dim(mtesting2)
+```
+
+Removing 1st column
+```{r}
+mtraining2<- mtraining2[,-1]
+mvali2<- mvali2[,-1]
+mtesting2<- mtesting2[,-1]
+dim(mtraining2)
+dim(mvali2)
+dim(mtesting2)
+```
+
+###Modeling
+
+Decision Tree
+```{r}
+modelTree<- rpart(classe~., data = mtraining2, method = "class")
+predicttree<- predict(modelTree, mvali2, type = "class")
+confusionMatrix(predicttree, mvali2$classe)
+```
+The estimated accuracy for Decision Tree is 87.41%
+
+
+Random Forest
+```{r}
+modelrf<- randomForest(classe~., data = mtraining2)
+predicttree2<- predict(modelrf, mvali2, type = "class")
+confusionMatrix(predicttree2, mvali2$classe)
+```
+The estimated accuracy for Random Forest is 99.78% as this method automatically selects important variables.
+
+Random Forest yield better results than Decision Tree.
+
+###Applying results to Testing Data Set
+```{r}
+mtesting3 <- mtesting2[,-ncol(mtesting2)]
+mtesting3 <- rbind(mtraining2[100, -58] , mtesting3) 
+row.names(mtesting3)<- c(100, 1:20)
+predict3<- predict(modelrf, newdata= mtesting3[-1,], type ="class")
+predict3
+```
+
+```{r}
+pml_write_files = function(x){
+    n = length(x)
+    for (i in 1:n){
+        filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file = filename, quote = FALSE, row.names= FALSE, col.names = FALSE)
+    }
+}
+
+pml_write_files(predict3)
+```
